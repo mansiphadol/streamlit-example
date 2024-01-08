@@ -1,40 +1,54 @@
-import altair as alt
-import numpy as np
-import pandas as pd
 import streamlit as st
+from hugchat import hugchat  # agent for converstaional ai
+from hugchat.login import Login
+import pandas as pd
 
-"""
-# Welcome to Streamlit!
+# Log in to Hugging Face and obtain cookies
+email = "add your hugging chat email here"
+passwd = "Add your password here"
+sign = Login(email, passwd)
+cookies = sign.login()
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:.
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+# Function to load and preprocess the dataset
 
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
 
-num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
-num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
+def load_dataset(file_path):
+    data = pd.read_csv(file_path)
+    return data
 
-indices = np.linspace(0, 1, num_points)
-theta = 2 * np.pi * num_turns * indices
-radius = indices
+# Function to convert the row of dataset into string
 
-x = radius * np.cos(theta)
-y = radius * np.sin(theta)
 
-df = pd.DataFrame({
-    "x": x,
-    "y": y,
-    "idx": indices,
-    "rand": np.random.randn(num_points),
-})
+def query_chatbot(chatbot, data, query):
+    context = " ".join(data.apply(
+        lambda row: " ".join(row.astype(str)), axis=1).tolist())
+    full_query = query + context  # combining the context
+    query_result = chatbot.query(full_query)
+    return query_result
 
-st.altair_chart(alt.Chart(df, height=700, width=700)
-    .mark_point(filled=True)
-    .encode(
-        x=alt.X("x", axis=None),
-        y=alt.Y("y", axis=None),
-        color=alt.Color("idx", legend=None, scale=alt.Scale()),
-        size=alt.Size("rand", legend=None, scale=alt.Scale(range=[1, 150])),
-    ))
+# Streamlit UI
+
+
+def main():
+    st.title("ChatCSV bot")
+
+    # Upload dataset
+    uploaded_file = st.file_uploader("Upload CSV Dataset", type=["csv"])
+
+    if uploaded_file is not None:
+        data = load_dataset(uploaded_file)  # process the dataset file
+
+        st.subheader("View Uploaded Dataset")
+        st.dataframe(data)
+
+        st.subheader("Chatbot Query")
+        query = st.text_input("Ask a question to the chatbot:")
+        if st.button("Ask"):
+            chatbot = hugchat.ChatBot(cookies=cookies.get_dict())
+            # initializing the chatbot
+            query_result = query_chatbot(chatbot, data, query)
+            st.success(f"Chatbot Response: {query_result['text']}")
+
+
+if __name__ == "__main__":
+    main()
